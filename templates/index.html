@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickPrint</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            width: 480px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { text-align: center; color: #667eea; font-size: 32px; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #999; margin-bottom: 25px; font-size: 14px; }
+        .upload-area {
+            border: 2px dashed #667eea;
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+        .upload-area:hover { background: #f0f0ff; }
+        .upload-area p { color: #667eea; font-size: 14px; margin-top: 8px; }
+        input[type="file"] { display: none; }
+        .preview-box {
+            display: none;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .preview-box iframe {
+            width: 100%;
+            height: 300px;
+            border: none;
+        }
+        .preview-label {
+            background: #f8f8ff;
+            padding: 8px 15px;
+            font-size: 12px;
+            color: #667eea;
+            border-bottom: 1px solid #eee;
+        }
+        .info-box {
+            background: #f8f8ff;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .info-box p { color: #444; font-size: 14px; }
+        label { font-size: 13px; color: #666; display: block; margin-bottom: 5px; }
+        select, input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        .price-box {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .price-box p { color: white; font-size: 13px; }
+        .price-box h2 { color: white; font-size: 28px; }
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            display: none;
+        }
+        .btn:hover { opacity: 0.9; }
+        .success {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: green;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>🖨️ QuickPrint</h1>
+    <p class="subtitle">Upload • Pay • Print</p>
+
+    <div class="upload-area" onclick="document.getElementById('pdfInput').click()">
+        <div style="font-size:40px">📄</div>
+        <p id="uploadText">Click to upload your PDF</p>
+    </div>
+    <input type="file" id="pdfInput" accept=".pdf" onchange="handleFile(this)">
+
+    <div class="preview-box" id="previewBox">
+        <div class="preview-label">📄 Preview — Check your PDF before paying</div>
+        <iframe id="pdfPreview"></iframe>
+    </div>
+
+    <div class="info-box" id="infoBox">
+        <p>📄 Pages: <strong id="pageCount">0</strong></p>
+    </div>
+
+    <label>Print Type</label>
+    <select id="printType" onchange="calculatePrice()">
+        <option value="bw">Black & White (₹1.5/page)</option>
+        <option value="color">Colour (₹10/page)</option>
+    </select>
+
+    <label>Number of Copies</label>
+    <input type="number" id="copies" value="1" min="1" onchange="calculatePrice()">
+
+    <label>Page Size</label>
+    <select id="pageSize">
+        <option value="A4">A4</option>
+        <option value="A3">A3</option>
+    </select>
+
+    <div class="price-box" id="priceBox">
+        <p>Total Amount</p>
+        <h2>₹<span id="totalPrice">0</span></h2>
+    </div>
+
+    <button class="btn" id="payBtn" onclick="startPayment()">
+        💳 Pay & Print
+    </button>
+
+    <div class="success" id="successMsg">
+        ✅ Payment successful! Sending to printer...
+    </div>
+</div>
+
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+    let totalPages = 0;
+    let uploadedFile = null;
+
+    function handleFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+        uploadedFile = file;
+        document.getElementById('uploadText').textContent = file.name;
+
+        // Show PDF Preview
+        const fileURL = URL.createObjectURL(file);
+        document.getElementById('pdfPreview').src = fileURL;
+        document.getElementById('previewBox').style.display = 'block';
+
+        // Get page count
+        const formData = new FormData();
+        formData.append('pdf', file);
+        fetch('/get_page_count', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            totalPages = data.pages;
+            document.getElementById('pageCount').textContent = totalPages;
+            document.getElementById('infoBox').style.display = 'block';
+            calculatePrice();
+        });
+    }
+
+    function calculatePrice() {
+        if (totalPages === 0) return;
+        const type = document.getElementById('printType').value;
+        const copies = parseInt(document.getElementById('copies').value);
+        const rate = type === 'bw' ? 1.5 : 10;
+        const total = totalPages * copies * rate;
+        document.getElementById('totalPrice').textContent = total.toFixed(2);
+        document.getElementById('priceBox').style.display = 'block';
+        document.getElementById('payBtn').style.display = 'block';
+    }
+
+    function startPayment() {
+        const amount = parseFloat(document.getElementById('totalPrice').textContent);
+        fetch('/create_order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount: amount })
+        })
+        .then(res => res.json())
+        .then(order => {
+            const options = {
+                key: "rzp_live_SsedmXyyq60Flg",
+                amount: order.amount,
+                currency: "INR",
+                name: "QuickPrint",
+                description: "Print Service",
+                order_id: order.id,
+                handler: function(response) {
+                    sendToPrinter();
+                },
+                theme: { color: "#667eea" }
+            };
+            const rzp = new Razorpay(options);
+            rzp.open();
+        });
+    }
+
+    function sendToPrinter() {
+        const formData = new FormData();
+        formData.append('pdf', uploadedFile);
+        formData.append('copies', document.getElementById('copies').value);
+        formData.append('print_type', document.getElementById('printType').value);
+        fetch('/print_file', { method: 'POST', body: formData })
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('successMsg').style.display = 'block';
+            document.getElementById('payBtn').style.display = 'none';
+        });
+    }
+</script>
+</body>
+</html>

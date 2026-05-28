@@ -1,0 +1,5 @@
+flask
+razorpay
+PyPDF2
+reportlab
+gunicorn
