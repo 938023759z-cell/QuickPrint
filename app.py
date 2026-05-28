@@ -6,8 +6,8 @@ import os
 app = Flask(__name__)
 
 # Razorpay Keys
-RAZORPAY_KEY_ID = "rzp_live_SsedmXyyq60FIg"
-RAZORPAY_KEY_SECRET = "VSLRY0ehq27ocaksE7vLhlJQ"
+RAZORPAY_KEY_ID = "rzp_live_Suu4ZjuuZINyry"
+RAZORPAY_KEY_SECRET = "pV6iNCGzwAIgy33sIxfyEb1I"
 
 # Pricing
 BW_PRICE = 1.5   # ₹1.5 per page black & white
